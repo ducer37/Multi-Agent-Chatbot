@@ -1,0 +1,44 @@
+# Lõi LangChain và xử lý văn bản
+langchain
+langchain-community
+langchain-text-splitters
+
+# Xử lý PDF (Bắt buộc cho pdf_loader.py)
+pymupdf
+pymupdf4llm
+langchain-qdrant
+
+# --- PHẦN THAY ĐỔI: Embedding và Vector DB (Bỏ torch/sentence-transformers) ---
+onnxruntime
+tokenizers
+qdrant-client
+fastembed
+qdrant-client[fastembed]
+langgraph-checkpoint-postgres 
+psycopg[binary,pool]
+# Các thư viện hỗ trợ Agent và MCP của bạn (Giữ nguyên của bạn)
+python-dotenv
+mcp[cli]
+pydantic
+python-docx
+pandas
+openpyxl
+groq
+google-api-python-client 
+google-auth-httplib2 
+google-auth-oauthlib
+langgraph 
+langchain-groq
+langchain-mcp-adapters
+langsmith
+
+# API Service
+fastapi
+uvicorn[standard]
+
+# Notebook
+ipykernel
+ragas
+datasets
+matplotlib
+seaborn

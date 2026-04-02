@@ -1,0 +1,14 @@
+services:
+  rag-tester:
+    build: .
+    container_name: hust-rag-service
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          memory: 2G 
+    tty: true 
+    stdin_open: true
