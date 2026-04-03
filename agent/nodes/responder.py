@@ -1,5 +1,6 @@
 from agent.prompts import RESPONDER_PROMPT
 from agent.utils import get_trimmed_messages
+from langchain_core.messages import SystemMessage
 
 from agent.llm import responder_llm
 

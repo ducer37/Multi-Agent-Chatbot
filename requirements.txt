@@ -35,6 +35,7 @@ langsmith
 # API Service
 fastapi
 uvicorn[standard]
+chainlit
 
 # Notebook
 ipykernel

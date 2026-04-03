@@ -1,14 +1,30 @@
 services:
-  rag-tester:
-    build: .
-    container_name: hust-rag-service
-    volumes:
-      - .:/app
+  api:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: hust-multi-agent-api
     env_file:
       - .env
-    deploy:
-      resources:
-        limits:
-          memory: 2G 
-    tty: true 
-    stdin_open: true
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./workspace:/app/workspace
+      - ./rag_docstore:/app/rag_docstore
+      - ./fastembed_cache:/app/fastembed_cache
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/status', timeout=5)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
