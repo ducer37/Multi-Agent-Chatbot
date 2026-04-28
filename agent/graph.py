@@ -2,18 +2,20 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 from functools import partial
 
-from agent.nodes import supervisor_node, workspace_agent_node, schedule_agent_node, rag_agent_node, responder_node, cleanup_node
+from agent.nodes import supervisor_node, workspace_agent_node, schedule_agent_node, rag_agent_node, research_agent_node, responder_node
 from agent.state import AgentState
 from agent.edges import agent_should_continue
 
-from agent.llm import rag_llm, workspace_llm, schedule_llm
+from agent.llm import rag_llm, workspace_llm, schedule_llm, research_llm
+from agent.schema import AgentResponse
 
-def create_multi_agent_graph(workspace_tools, schedule_tools, rag_tools, checkpointer):
+def create_multi_agent_graph(workspace_tools, schedule_tools, rag_tools, research_tools, checkpointer):
     workflow = StateGraph(AgentState)
 
-    rag_agent_llm = rag_llm.bind_tools(rag_tools)
-    workspace_agent_llm = workspace_llm.bind_tools(workspace_tools)
-    schedule_agent_llm = schedule_llm.bind_tools(schedule_tools)
+    rag_agent_llm = rag_llm.bind_tools(rag_tools + [AgentResponse])
+    workspace_agent_llm = workspace_llm.bind_tools(workspace_tools + [AgentResponse])
+    schedule_agent_llm = schedule_llm.bind_tools(schedule_tools + [AgentResponse])
+    research_agent_llm = research_llm.bind_tools(research_tools + [AgentResponse])
 
     workflow.add_node("supervisor", supervisor_node)
     workflow.add_node("responder", responder_node)
@@ -27,7 +29,8 @@ def create_multi_agent_graph(workspace_tools, schedule_tools, rag_tools, checkpo
     workflow.add_node("rag_agent", partial(rag_agent_node, llm=rag_agent_llm))
     workflow.add_node("rag_tools", ToolNode(rag_tools))
 
-    workflow.add_node("cleanup", cleanup_node)
+    workflow.add_node("research_agent", partial(research_agent_node, llm=research_agent_llm))
+    workflow.add_node("research_tools", ToolNode(research_tools))
 
     workflow.add_edge(START, "supervisor")
 
@@ -38,30 +41,36 @@ def create_multi_agent_graph(workspace_tools, schedule_tools, rag_tools, checkpo
             "workspace_agent": "workspace_agent",
             "schedule_agent": "schedule_agent",
             "rag_agent": "rag_agent",
-            "FINISH": "responder"
+            "research_agent": "research_agent",
+            "responder": "responder",
+            "END": END
         }
     )
 
     workflow.add_conditional_edges(
         "workspace_agent", agent_should_continue,
-        {"continue": "workspace_tools", "cleanup": "cleanup"}
+        {"continue": "workspace_tools", "supervisor": "supervisor", "responder": "responder"}
     )
     workflow.add_edge("workspace_tools", "workspace_agent")
 
     workflow.add_conditional_edges(
         "schedule_agent", agent_should_continue,
-        {"continue": "schedule_tools", "cleanup": "cleanup"}
+        {"continue": "schedule_tools", "supervisor": "supervisor", "responder": "responder"}
     )
     workflow.add_edge("schedule_tools", "schedule_agent")
 
     workflow.add_conditional_edges(
         "rag_agent", agent_should_continue,
-        {"continue": "rag_tools", "cleanup": "cleanup"}
+        {"continue": "rag_tools", "supervisor": "supervisor", "responder": "responder"}
     )
     workflow.add_edge("rag_tools", "rag_agent")
 
-    workflow.add_edge("responder", "cleanup")
+    workflow.add_conditional_edges(
+        "research_agent", agent_should_continue,
+        {"continue": "research_tools", "supervisor": "supervisor", "responder": "responder"}
+    )
+    workflow.add_edge("research_tools", "research_agent")
 
-    workflow.add_edge("cleanup", END)
+    workflow.add_edge("responder", END)
     
     return workflow.compile(checkpointer=checkpointer)

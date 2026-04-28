@@ -13,6 +13,11 @@ class ChatRequest(BaseModel):
         description="ID phiên chat để AI ghi nhớ ngữ cảnh (In-memory)",
         example="ducer_session_101"
     )
+    user_id: Optional[str] = Field(
+        default=None,
+        description="ID của người dùng để cấp quyền OAuth (VD: Google Drive)",
+        example="user_001"
+    )
 
 class ChatResponse(BaseModel):
     """Khuôn mẫu dữ liệu Server trả về cho Client."""

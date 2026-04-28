@@ -12,11 +12,13 @@ load_dotenv()
 from services.mcp_client import MCPClient
 from agent.graph import create_multi_agent_graph
 from api.routes import router
+from api.auth_routes import router as auth_router
 
 MCP_SERVERS = {
     "workspace": {"name": "File-Master",      "path": "server/mcp_server.py"},
     "schedule":  {"name": "Schedule-Master",   "path": "server/schedule_server.py"},
     "rag":       {"name": "Knowledge-Master",  "path": "rag/mcp_server.py"},
+    "research":  {"name": "Research-Master",   "path": "server/arxiv_server.py"},
 }
 
 DB_URI = os.getenv("POSTGRES_URI")
@@ -43,6 +45,10 @@ async def lifespan(app: FastAPI):
         await checkpointer.setup() 
         print("  ✅ Cơ sở dữ liệu trí nhớ đã sẵn sàng!")
 
+        from services.db_service import init_db
+        print("  🗄️ Đang khởi tạo bảng Database cho User & OAuth Tokens...")
+        init_db()
+
         for role, server_info in MCP_SERVERS.items():
             print(f"  🔌 Đang kết nối MCP Server: {server_info['name']}...")
             
@@ -57,13 +63,22 @@ async def lifespan(app: FastAPI):
         workspace_tools = await all_sessions["workspace"]["client"].get_langchain_tools(all_sessions["workspace"]["session"])
         schedule_tools = await all_sessions["schedule"]["client"].get_langchain_tools(all_sessions["schedule"]["session"])
         rag_tools = await all_sessions["rag"]["client"].get_langchain_tools(all_sessions["rag"]["session"])
+        research_tools = await all_sessions["research"]["client"].get_langchain_tools(all_sessions["research"]["session"])
         
-        print(f"  📦 Workspace: {len(workspace_tools)} | Schedule: {len(schedule_tools)} | RAG: {len(rag_tools)} tools")
+        print(f"  📦 Workspace: {len(workspace_tools)} | Schedule: {len(schedule_tools)} | RAG: {len(rag_tools)} | Research: {len(research_tools)} tools")
         
-        langgraph_app = create_multi_agent_graph(workspace_tools, schedule_tools, rag_tools, checkpointer)
+        langgraph_app = create_multi_agent_graph(workspace_tools, schedule_tools, rag_tools, research_tools, checkpointer)
         app.state.agent = langgraph_app
         
-        total = len(workspace_tools) + len(schedule_tools) + len(rag_tools)
+        # Auto-inject: Build danh sách tool descriptions cho Responder
+        all_tools_list = workspace_tools + schedule_tools + rag_tools + research_tools
+        tool_desc_lines = []
+        for t in all_tools_list:
+            desc = (t.description or "").split('\n')[0][:80]  # Dòng đầu, tối đa 80 ký tự
+            tool_desc_lines.append(f"- {t.name}: {desc}")
+        app.state.tool_descriptions = "\n".join(tool_desc_lines)
+        
+        total = len(workspace_tools) + len(schedule_tools) + len(rag_tools) + len(research_tools)
         print(f"✅ Hệ thống Multi-Agent sẵn sàng! ({total} tools từ {len(MCP_SERVERS)} servers)")
         yield
         
@@ -76,14 +91,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HUST Multi-Agent API",
-    description="API đa tác nhân: Supervisor điều phối Workspace, Schedule và RAG Agent.",
+    description="API đa tác nhân: Supervisor điều phối Workspace, Schedule, RAG và Research Agent.",
     version="3.1.0",
     lifespan=lifespan
 )
 
 app.include_router(router)
+app.include_router(auth_router)
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8000"))
-    uvicorn.run("main:app", host=host, port=port, reload=True, reload_excludes=["workspace/*", "token.json"])
+    uvicorn.run("main:app", host=host, port=port, reload=True, reload_dirs=["api", "agent", "services", "rag", "server"])

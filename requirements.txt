@@ -32,6 +32,9 @@ langchain-groq
 langchain-mcp-adapters
 langsmith
 
+# ArXiv Paper Search
+arxiv
+
 # API Service
 fastapi
 uvicorn[standard]
@@ -43,3 +46,7 @@ ragas
 datasets
 matplotlib
 seaborn
+
+google-auth-oauthlib 
+google-auth-httplib2 
+google-api-python-client

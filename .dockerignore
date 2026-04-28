@@ -1,34 +1,19 @@
-.git
-.gitignore
-.venv
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.log
+.Python
+env/
+venv/
+.venv/
+workspace/
+rag_docstore/
+.git/
+.gitignore
+.dockerignore
 .DS_Store
 
-# Local env/secrets
+# Tuyệt đối không copy các file chứa Secrets vào Image
 .env
 credentials.json
 token.json
-
-# Local runtime data / caches
-fastembed_cache/
-rag_docstore/
-workspace/
-
-# Dev/evaluation artifacts
-evaluation/
-notebooks/
-.ipynb_checkpoints/
-
-# Python tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Build artifacts
-build/
-dist/
-*.egg-info/

@@ -13,6 +13,7 @@ token.json
 .env
 
 # --- Local Workspace ---
+docs/
 workspace/
 evaluation/notebook/
 # --- RAG / ML ---

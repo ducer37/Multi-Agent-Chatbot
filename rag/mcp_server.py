@@ -3,7 +3,8 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from rag.retrieval.retriever import retrieve_documents 
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+load_dotenv(env_path)
 
 mcp = FastMCP("HUST-Knowledge-Master")
 COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "quy_che_dhbk")

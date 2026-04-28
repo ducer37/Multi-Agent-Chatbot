@@ -4,26 +4,18 @@ import sys
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from services.drive_service import list_drive_files, delete_drive_file, upload_file
+from utils.path_security import get_safe_path, WORKSPACE
 
 load_dotenv()
 
 mcp = FastMCP("HUST-File-Master")
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WORKSPACE = os.path.join(BASE_DIR, os.getenv("WORKSPACE_DIR", "workspace"))
-os.makedirs(WORKSPACE, exist_ok=True)
-
-def get_safe_path(filename: str) -> str:
-    safe_path = os.path.abspath(os.path.join(WORKSPACE, filename))
-    if not safe_path.startswith(os.path.abspath(WORKSPACE)):
-        raise ValueError("Truy cập ngoài workspace bị từ chối!")
-    return safe_path
 
 @mcp.tool()
-def write_text_file(filename: str, content: str) -> str:
+def write_text_file(user_id: str, filename: str, content: str) -> str:
     """Tạo hoặc ghi đè file văn bản (.py, .txt, .md, .html)."""
     try:
-        path = get_safe_path(filename)
+        path = get_safe_path(user_id, filename)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
         return f"✅ Đã tạo file: {filename}"
@@ -31,7 +23,7 @@ def write_text_file(filename: str, content: str) -> str:
         return f"❌ Lỗi: {str(e)}"
 
 @mcp.tool()
-def execute_python_agent(script: str) -> str:
+def execute_python_agent(user_id: str, script: str) -> str:
     """
     THỰC THI MÃ PYTHON ĐỂ TẠO FILE (.docx, .xlsx, .pdf).
     QUY TẮC BẮT BUỘC:
@@ -39,9 +31,9 @@ def execute_python_agent(script: str) -> str:
     2. TUYỆT ĐỐI KHÔNG sử dụng Node.js, JavaScript hoặc gọi subprocess để chạy ngôn ngữ khác.
     3. Luôn sử dụng biến WORKSPACE có sẵn để lưu file qua os.path.join(WORKSPACE, filename).
     """
-    temp_script_path = get_safe_path("_temp_script.py")
-    # Tiêm sẵn WORKSPACE vào script để Claude sử dụng
-    enriched_script = f"import os\nWORKSPACE='{WORKSPACE}'\n{script}"
+    temp_script_path = get_safe_path(user_id, "_temp_script.py")
+    user_workspace = os.path.join(WORKSPACE, user_id)
+    enriched_script = f"import os\nWORKSPACE='{user_workspace}'\n{script}"
     
     try:
         with open(temp_script_path, "w", encoding="utf-8") as f:
@@ -64,12 +56,16 @@ def execute_python_agent(script: str) -> str:
         return f"❌ Lỗi hệ thống: {str(e)}"
 
 @mcp.tool()
-def list_local_files() -> str:
-    """Liệt kê file trong thư mục LOCAL workspace trên máy tính."""
+def list_local_files(user_id: str) -> str:
+    """Liệt kê file trong thư mục LOCAL workspace cá nhân trên máy tính."""
     try:
-        files = os.listdir(WORKSPACE)
+        user_workspace = os.path.join(WORKSPACE, user_id)
+        if not os.path.exists(user_workspace):
+            return "📁 Thư mục workspace cá nhân của bạn hiện đang rỗng."
+            
+        files = os.listdir(user_workspace)
         if not files:
-            return "📁 Thư mục workspace hiện đang rỗng."
+            return "📁 Thư mục workspace cá nhân của bạn hiện đang rỗng."
         
         # Lọc bỏ các file ẩn nếu cần (.DS_Store...)
         visible_files = [f for f in files if not f.startswith('.')]
@@ -78,16 +74,16 @@ def list_local_files() -> str:
         return f"❌ Lỗi khi liệt kê file: {str(e)}"
 
 @mcp.tool()
-def delete_file(filename: str) -> str:
+def delete_file(user_id: str, filename: str) -> str:
     """
-    Xóa một file cụ thể trong thư mục workspace. 
+    Xóa một file cụ thể trong thư mục workspace cá nhân. 
     Yêu cầu cung cấp chính xác tên file (bao gồm cả phần mở rộng).
     """
     try:
         if not filename:
             return "⚠️ Vui lòng cung cấp tên file cần xóa."
             
-        path = get_safe_path(filename)
+        path = get_safe_path(user_id, filename)
         
         if os.path.exists(path):
             os.remove(path)
@@ -99,10 +95,10 @@ def delete_file(filename: str) -> str:
         return f"❌ Lỗi khi xóa file: {str(e)}"
 
 @mcp.tool()
-def list_google_drive(limit: int = 5) -> str:
-    """Liệt kê file trên Cloud GOOGLE DRIVE cá nhân."""
+def list_google_drive(user_id: str, limit: int = 5) -> str:
+    """Liệt kê file trên Cloud GOOGLE DRIVE cá nhân của user_id."""
     try:
-        files = list_drive_files(limit)
+        files = list_drive_files(user_id, limit)
         if not files:
             return "📭 Drive của bạn trống không."
 
@@ -112,26 +108,26 @@ def list_google_drive(limit: int = 5) -> str:
         return f"❌ Lỗi Drive: {str(e)}"
 
 @mcp.tool()
-def upload_to_drive(filename: str) -> str:
-    """Tải một file từ thư mục LOCAL workspace lên Google Drive."""
+def upload_to_drive(user_id: str, filename: str) -> str:
+    """Tải một file từ thư mục LOCAL workspace lên Google Drive của user_id."""
     try:
-        path = get_safe_path(filename)
+        path = get_safe_path(user_id, filename)
         if not os.path.exists(path):
-            return f"❌ Không tìm thấy file {filename} trong workspace."
+            return f"❌ Không tìm thấy file {filename} trong workspace cá nhân."
         
-        file_id = upload_file(path)
+        file_id = upload_file(user_id, path)
         return f"🚀 Đã tải lên Drive thành công! ID file mới: {file_id}"
     except Exception as e:
         return f"❌ Lỗi khi tải lên: {str(e)}"
 
 @mcp.tool()
-def delete_from_drive(file_id: str) -> str:
+def delete_from_drive(user_id: str, file_id: str) -> str:
     """
-    Xóa file trên Google Drive. 
+    Xóa file trên Google Drive của user_id. 
     LƯU Ý: Cần cung cấp ID của file (lấy từ tool list_google_drive).
     """
     try:
-        delete_drive_file(file_id)
+        delete_drive_file(user_id, file_id)
         return f"🗑️ Đã xóa file trên Drive (ID: {file_id})"
     except Exception as e:
         return f"❌ Lỗi khi xóa trên Drive: {str(e)}"
